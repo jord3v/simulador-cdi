@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/recent_search.dart';
+import 'history_screen.dart';
 
 class FormScreen extends StatefulWidget {
   const FormScreen({super.key});
@@ -28,35 +29,22 @@ class _FormScreenState extends State<FormScreen> {
   
   bool _isLoading = false;
 
-  List<RecentSearch> _recentSearches = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRecentSearches();
-  }
-
-  Future<void> _loadRecentSearches() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = prefs.getStringList('recentSearches') ?? [];
-    setState(() {
-      _recentSearches = jsonList.map((j) => RecentSearch.fromJson(j)).toList();
-    });
-  }
-
   Future<void> _saveRecentSearch(RecentSearch search) async {
     final prefs = await SharedPreferences.getInstance();
-    final newList = [search, ..._recentSearches];
-    // Keep only top 5 unique searches
+    final jsonList = prefs.getStringList('recentSearches') ?? [];
+    final oldList = jsonList.map((j) => RecentSearch.fromJson(j)).toList();
+    
+    final newList = [search, ...oldList];
+    // Keep only unique searches
     final List<RecentSearch> uniqueList = [];
     for (var s in newList) {
       if (!uniqueList.any((e) => e.valorInicial == s.valorInicial && e.aporteMensal == s.aporteMensal && e.percentualCdi == s.percentualCdi && e.dataInicial == s.dataInicial)) {
         uniqueList.add(s);
       }
-      if (uniqueList.length >= 5) break;
+      // No strict cap to allow full list
+      if (uniqueList.length >= 100) break;
     }
     await prefs.setStringList('recentSearches', uniqueList.map((s) => s.toJson()).toList());
-    _loadRecentSearches();
   }
 
   Future<void> _selectDate(BuildContext context, bool isInitial) async {
@@ -239,12 +227,38 @@ class _FormScreenState extends State<FormScreen> {
                     ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
                     : const Text('SIMULAR AGORA', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 16),
               
-              if (_recentSearches.isNotEmpty) ...[
-                _buildRecentSearches(),
-                const SizedBox(height: 40),
-              ],
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => HistoryScreen(
+                        onSelect: (search) {
+                          setState(() {
+                            _valorInicialController.text = search.valorInicial.toString().replaceAll('.0', '');
+                            _percentualCdiController.text = search.percentualCdi.toString().replaceAll('.0', '');
+                            _aporteMensalController.text = search.aporteMensal.toString().replaceAll('.0', '');
+                            _diaAporteController.text = search.diaAporte.toString();
+                            _dataInicial = DateFormat('dd/MM/yyyy').parse(search.dataInicial);
+                            _dataFinal = null;
+                          });
+                          _simular();
+                        },
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.history, color: Color(0xFF64748B)),
+                label: const Text('Ver Histórico de Consultas', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 40),
               
               _buildFooter(),
             ],
@@ -320,56 +334,6 @@ class _FormScreenState extends State<FormScreen> {
     );
   }
 
-  Widget _buildRecentSearches() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Consultas Recentes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-        const SizedBox(height: 12),
-        ..._recentSearches.map((search) {
-          final fmt = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-          return InkWell(
-            onTap: () {
-              setState(() {
-                _valorInicialController.text = search.valorInicial.toString().replaceAll('.0', '');
-                _percentualCdiController.text = search.percentualCdi.toString().replaceAll('.0', '');
-                _aporteMensalController.text = search.aporteMensal.toString().replaceAll('.0', '');
-                _diaAporteController.text = search.diaAporte.toString();
-                _dataInicial = DateFormat('dd/MM/yyyy').parse(search.dataInicial);
-                _dataFinal = null;
-              });
-              _simular();
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.history, color: Color(0xFF94A3B8), size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${fmt.format(search.valorInicial)} + ${fmt.format(search.aporteMensal)}/mês', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        Text('${search.percentualCdi.toString().replaceAll('.0', '')}% CDI • Início: ${search.dataInicial}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ],
-    );
-  }
 
   Widget _buildModernInput({
     required String label,

@@ -265,7 +265,7 @@ class _FormScreenState extends State<FormScreen> {
             ),
             InkWell(
               onTap: () async {
-                final url = Uri.parse('https://github.com/jord3v/simular-cdi/releases/latest/download/app-release.apk');
+                final url = Uri.parse('https://github.com/jord3v/simular-cdi/raw/refs/heads/master/app-release.apk');
                 if (await canLaunchUrl(url)) {
                   await launchUrl(url, mode: LaunchMode.externalApplication);
                 }
